@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 const cfg = window.MANASIK_CONFIG;
 const match = location.pathname.match(/^\/manasik\/k\/([A-Za-z2-9]{6,12})\/?$/);
-let client, user, khatma, parts=[], active, page, book, bundles=new Map(), blobUrl, textMode=false, claimJuz, busy=false;
+let client, user, khatma, parts=[], active, page, book, bundles=new Map(), blobUrl, textMode=true, claimJuz, busy=false;
 let saving=Promise.resolve(), renderGeneration=0, refreshGeneration=0;
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
