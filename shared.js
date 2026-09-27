@@ -2,7 +2,7 @@ const $ = id => document.getElementById(id);
 const cfg = window.MANASIK_CONFIG;
 const match = location.pathname.match(/^\/manasik\/k\/([A-Za-z2-9]{6,12})\/?$/);
 let client, user, khatma, parts=[], active, page, book, bundles=new Map(), blobUrl, textMode=true, claimJuz, busy=false;
-let saving=Promise.resolve(), renderGeneration=0, refreshGeneration=0;
+let saving=Promise.resolve(), renderGeneration=0, refreshGeneration=0, liveChannel, liveRefreshTimer;
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
   set(key,value) { try { localStorage.setItem(key,String(value)); return true; } catch { return false; } },
@@ -76,7 +76,7 @@ async function refresh() {
   ]);
   if(generation!==refreshGeneration)return;
   nextParts.sort((a,b)=>a.juz-b.juz);
-  if(JSON.stringify(nextParts)===JSON.stringify(parts)&&latest.is_closed===khatma.is_closed){$('live-status').textContent='متصل · يتم تحديث حالة الأجزاء كل 10 ثوانٍ.';return;}
+  if(JSON.stringify(nextParts)===JSON.stringify(parts)&&latest.is_closed===khatma.is_closed){ensureRealtime();$('live-status').textContent='متصل · التحديث اللحظي مفعّل.';return;}
   parts=nextParts;khatma=latest;heading(khatma);
   renderMemorial();
   stats(parts.filter(p=>p.status==='completed').length,parts.filter(p=>p.status==='claimed').length,parts.filter(p=>p.status==='available').length);
@@ -92,7 +92,24 @@ async function refresh() {
     const state=document.createElement('small');state.textContent=p.status==='completed'?'تمت القراءة ✓':p.status==='claimed'?(mine?'جزؤك · استكمال القراءة':'قيد القراءة'):'احجز وابدأ';
     button.append(title,name,state);button.addEventListener('click',()=>selectPart(p));$('parts').append(button);
   }
-  $('live-status').textContent='متصل · يتم تحديث حالة الأجزاء كل 10 ثوانٍ.';
+  ensureRealtime();
+  $('live-status').textContent='متصل · التحديث اللحظي مفعّل.';
+}
+function scheduleLiveRefresh() {
+  clearTimeout(liveRefreshTimer);
+  liveRefreshTimer=setTimeout(()=>{
+    if(khatma&&!busy&&!active&&!$('claim-dialog').open) refresh().catch(()=>$('live-status').textContent='انقطع التحديث اللحظي مؤقتًا؛ ستتم إعادة المحاولة تلقائيًا.');
+  },120);
+}
+function ensureRealtime() {
+  if(!client||!khatma||liveChannel)return;
+  liveChannel=client.channel('shared-khatma-'+khatma.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'khatma_parts',filter:'khatma_id=eq.'+khatma.id},scheduleLiveRefresh)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'khatmas',filter:'id=eq.'+khatma.id},scheduleLiveRefresh)
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED') $('live-status').textContent='متصل · التحديث اللحظي مفعّل.';
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') $('live-status').textContent='التحديث اللحظي متوقف مؤقتًا؛ يعمل التحديث الاحتياطي.';
+    });
 }
 function selectPart(p) {
   if(p.status==='available') {
@@ -148,6 +165,7 @@ async function showPage() {
 }
 function renderText() {
   const container=$('page-text');container.replaceChildren();container.hidden=false;
+  container.classList.toggle('opening-page',page<=2);
   let surah=0;
   for(const v of book.verses.filter(v=>v.page===page)) {
     if(v.surah!==surah){const h=document.createElement('h3');h.textContent=v.name;container.append(h);surah=v.surah;}
@@ -179,7 +197,8 @@ $('previous').onclick=()=>{page--;showPage();savePage();};$('next').onclick=()=>
 $('text-mode').onclick=()=>{textMode=!textMode;$('text-mode').textContent=textMode?'عرض المصحف':'قراءة نصية';showPage();};
 $('sync-page').onclick=savePage;$('complete').onclick=()=>finish();$('release').onclick=()=>finish(true);
 $('close-khatma').onclick=async()=>{if(busy||!await confirmAction(khatma.is_closed?'إعادة فتح الحجوزات؟':'إغلاق الحجوزات الجديدة؟'))return;busy=true;try{await rpc('set_khatma_closed',{p_khatma_id:khatma.id,p_closed:!khatma.is_closed});await refresh();}catch(e){$('live-status').textContent=message(e);}finally{busy=false;}};
-setInterval(()=>{if(khatma&&!document.hidden&&!busy&&!active&&!$('claim-dialog').open)refresh().catch(()=>$('live-status').textContent='تعذر التحديث التلقائي. تحقق من الاتصال واضغط تحديث.');},10000);
+// Realtime is primary; this slower poll recovers after tab suspension or a websocket interruption.
+setInterval(()=>{if(khatma&&!document.hidden&&!busy&&!active&&!$('claim-dialog').open)refresh().catch(()=>$('live-status').textContent='تعذر التحديث التلقائي. تحقق من الاتصال واضغط تحديث.');},30000);
 window.addEventListener('online',()=>{if(active)savePage();else if(khatma)refresh().catch(()=>{});});
 
 // These use the same member-only records and allowed action kinds as the app.
