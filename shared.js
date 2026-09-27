@@ -168,18 +168,22 @@ function renderText() {
   container.classList.toggle('opening-page',page<=2);
   const verses=book.verses.filter(v=>v.page===page);
   const first=verses[0];
-  const surahLabel=document.createElement('div');surahLabel.className='frame-label frame-surah';surahLabel.textContent=first?'سورة '+first.name:'';
-  const juzLabel=document.createElement('div');juzLabel.className='frame-label frame-juz';juzLabel.textContent='الجزء '+(first?.juz||active?.juz||'');
+  const surahLabel=document.createElement('div');surahLabel.className='frame-label frame-surah';surahLabel.textContent=first?surahTitle(first.name):'';
+  const juzLabel=document.createElement('div');juzLabel.className='frame-label frame-juz';juzLabel.textContent=juzTitle(first?.juz||active?.juz||1);
   const pageLabel=document.createElement('div');pageLabel.className='frame-label frame-page';pageLabel.textContent=String(page).replace(/[0-9]/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
   const body=document.createElement('div');body.className='quran-body';
   container.append(surahLabel,juzLabel,pageLabel,body);
   let surah=0;
   for(const v of verses) {
-    if(v.surah!==surah){const h=document.createElement('h3');h.textContent=v.name;body.append(h);surah=v.surah;}
-    const span=document.createElement('span');span.textContent=v.text+' ﴿'+v.ayah+'﴾ ';body.append(span);
+    if(v.surah!==surah){const h=document.createElement('h3');h.textContent=surahTitle(v.name);body.append(h);surah=v.surah;}
+    const span=document.createElement('span');span.textContent=v.text+' ﴿'+arabicDigits(v.ayah)+'﴾ ';body.append(span);
   }
   fitQuranPage(body,page<=2);
 }
+const juzOrdinals=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر','السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون','الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون','السادس والعشرون','السابع والعشرون','الثامن والعشرون','التاسع والعشرون','الثلاثون'];
+function arabicDigits(value){return String(value).replace(/[0-9]/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);}
+function surahTitle(name){const value=String(name||'').trim(),plain=value.replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'');return plain.startsWith('سورة')?value:'سورة '+value;}
+function juzTitle(value){const n=Math.max(1,Math.min(30,Number(value)||1));return 'الجزء '+juzOrdinals[n-1];}
 async function fitQuranPage(body,opening) {
   try{await document.fonts.ready;}catch(_){}
   requestAnimationFrame(()=>{

@@ -5,12 +5,13 @@
 
 /* The decorated sheet and Quran move as one page; no inner scrolling. */
 #paper{border:0;background:#fffdf7;min-height:0}
-#page-text{box-sizing:border-box;position:relative;width:100%;aspect-ratio:546/742;overflow:hidden;background:#fffdf7 url('quran-frames-composite-v5.png') right top/281.3% 138% no-repeat;color:#172c22}
+#page-text{box-sizing:border-box;position:relative;width:100%;aspect-ratio:546/770;overflow:hidden;padding:0;background:#fffdf7 url('quran-frames-composite-v5.png') right top/281.3% 143.2% no-repeat;color:#172c22}
 #page-text.opening-page{aspect-ratio:560/742;background-position:left top;background-size:274.3% 138%}
-.quran-body{position:absolute;inset:13% 12% 10% 13%;overflow:hidden;font-family:AmiriQuran,serif;font-size:31px;line-height:1.82;text-align:justify;text-align-last:center;direction:rtl}
+.quran-body{position:absolute;inset:13.7% 12.8% 15.2%;overflow:hidden;font-family:AmiriQuran,serif!important;font-size:31px;font-weight:400;font-style:normal;line-height:1.72;text-align:justify;text-align-last:center;direction:rtl;font-feature-settings:'liga' 1,'calt' 1;font-variant-ligatures:common-ligatures}
+.quran-body *{font-family:AmiriQuran,serif!important}
 .opening-page .quran-body{inset:21% 17% 22%;display:flex;align-content:center;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;font-size:34px;line-height:1.95}
-.quran-body h3{flex-basis:100%;font-size:.9em;background:#fffaf0e8;border:1px solid #c7ad7a;border-radius:22px;margin:.18em 1em}
-.frame-label{position:absolute;z-index:2;display:flex;align-items:center;justify-content:center;background:#fffaf0e8;font-family:AmiriQuran,serif;font-size:clamp(13px,2.5vw,19px);line-height:1.1;white-space:nowrap}
-.frame-surah{left:13%;top:4.7%;width:32%;height:4.2%}.frame-juz{right:13%;top:4.7%;width:32%;height:4.2%}.frame-page{left:45.5%;bottom:3.6%;width:9%;height:4.2%;border-radius:50%}
+.quran-body h3{flex-basis:100%;height:1.45em;min-height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 2em;font-size:.78em;line-height:1;background:transparent url('surah-title-v5.png') center/100% 100% no-repeat;border:0;border-radius:0;margin:.08em 0}
+.frame-label{position:absolute;z-index:2;display:flex;align-items:center;justify-content:center;padding:0;background:transparent;font-family:AmiriQuran,serif!important;font-size:clamp(13px,2.5vw,19px);font-weight:400;line-height:1;white-space:nowrap;text-align:center}
+.frame-surah{left:9%;top:4.8%;width:36%;height:6.2%}.frame-juz{right:9%;top:4.8%;width:36%;height:6.2%}.frame-page{left:44%;bottom:2.1%;width:12%;height:7%;border-radius:50%}
 .opening-page .frame-surah{left:10%;top:1.2%;width:36%}.opening-page .frame-juz{right:10%;top:1.2%;width:36%}.opening-page .frame-page{bottom:1.8%}
 @media(max-width:420px){.quran-body{font-size:24px}.opening-page .quran-body{font-size:27px}}
