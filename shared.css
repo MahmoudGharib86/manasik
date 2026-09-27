@@ -5,8 +5,8 @@
 
 /* The decorated sheet and Quran move as one page; no inner scrolling. */
 #paper{border:0;background:#fffdf7;min-height:0}
-#page-text{box-sizing:border-box;position:relative;width:100%;aspect-ratio:513/733;overflow:hidden;background:#fffdf7 url('quran-frames-composite-v4.png') right top/299.4% 139.7% no-repeat;color:#172c22}
-#page-text.opening-page{background-position:50% 0}
+#page-text{box-sizing:border-box;position:relative;width:100%;aspect-ratio:546/742;overflow:hidden;background:#fffdf7 url('quran-frames-composite-v5.png') right top/281.3% 138% no-repeat;color:#172c22}
+#page-text.opening-page{aspect-ratio:560/742;background-position:left top;background-size:274.3% 138%}
 .quran-body{position:absolute;inset:13% 12% 10% 13%;overflow:hidden;font-family:AmiriQuran,serif;font-size:31px;line-height:1.82;text-align:justify;text-align-last:center;direction:rtl}
 .opening-page .quran-body{inset:21% 17% 22%;display:flex;align-content:center;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;font-size:34px;line-height:1.95}
 .quran-body h3{flex-basis:100%;font-size:.9em;background:#fffaf0e8;border:1px solid #c7ad7a;border-radius:22px;margin:.18em 1em}
