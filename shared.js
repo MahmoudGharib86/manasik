@@ -166,11 +166,29 @@ async function showPage() {
 function renderText() {
   const container=$('page-text');container.replaceChildren();container.hidden=false;
   container.classList.toggle('opening-page',page<=2);
+  const verses=book.verses.filter(v=>v.page===page);
+  const first=verses[0];
+  const surahLabel=document.createElement('div');surahLabel.className='frame-label frame-surah';surahLabel.textContent=first?'سورة '+first.name:'';
+  const juzLabel=document.createElement('div');juzLabel.className='frame-label frame-juz';juzLabel.textContent='الجزء '+(first?.juz||active?.juz||'');
+  const pageLabel=document.createElement('div');pageLabel.className='frame-label frame-page';pageLabel.textContent=String(page).replace(/[0-9]/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
+  const body=document.createElement('div');body.className='quran-body';
+  container.append(surahLabel,juzLabel,pageLabel,body);
   let surah=0;
-  for(const v of book.verses.filter(v=>v.page===page)) {
-    if(v.surah!==surah){const h=document.createElement('h3');h.textContent=v.name;container.append(h);surah=v.surah;}
-    const span=document.createElement('span');span.textContent=v.text+' ﴿'+v.ayah+'﴾ ';container.append(span);
+  for(const v of verses) {
+    if(v.surah!==surah){const h=document.createElement('h3');h.textContent=v.name;body.append(h);surah=v.surah;}
+    const span=document.createElement('span');span.textContent=v.text+' ﴿'+v.ayah+'﴾ ';body.append(span);
   }
+  fitQuranPage(body,page<=2);
+}
+async function fitQuranPage(body,opening) {
+  try{await document.fonts.ready;}catch(_){}
+  requestAnimationFrame(()=>{
+    let size=opening?34:31,minimum=opening?20:15;
+    body.style.fontSize=size+'px';
+    while(size>minimum&&(body.scrollHeight>body.clientHeight+1||body.scrollWidth>body.clientWidth+1)){
+      size-=.5;body.style.fontSize=size+'px';
+    }
+  });
 }
 function savePage() {
   const p=active, n=page;if(!p||p.claimed_by!==user.id||p.status!=='claimed')return;

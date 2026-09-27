@@ -3,9 +3,14 @@
 
 .memorial-dialog{max-width:720px;max-height:85dvh;overflow-y:auto}.memorial-text{font-family:AmiriQuran,serif;font-size:28px;line-height:2.2;text-align:justify}#dhikr-count{display:block;margin:24px auto;font-size:28px;min-height:100px}
 
-/* The web reader uses the same supplied illuminated sheet as the app. */
-#paper{border:0;background:#fffdf7}
-#page-text{box-sizing:border-box;width:100%;aspect-ratio:500/708;overflow:auto;background:#fffdf7 url('quran-frames-composite-v3.png') left top/307.2% 144.64% no-repeat;font-size:clamp(20px,4vw,31px);line-height:2.05;padding:13% 10% 14%}
-#page-text.opening-page{background-position:50% 0;display:flex;align-content:center;align-items:center;justify-content:center;flex-wrap:wrap;padding:22% 17% 20%;font-size:clamp(23px,4.5vw,34px);text-align:center}
-#page-text h3{flex-basis:100%;font-size:.92em;background:#fffaf0dd;margin:.25em 1em}
-@media(max-width:420px){#page-text{font-size:clamp(18px,5.4vw,25px)}}
+/* The decorated sheet and Quran move as one page; no inner scrolling. */
+#paper{border:0;background:#fffdf7;min-height:0}
+#page-text{box-sizing:border-box;position:relative;width:100%;aspect-ratio:513/733;overflow:hidden;background:#fffdf7 url('quran-frames-composite-v4.png') right top/299.4% 139.7% no-repeat;color:#172c22}
+#page-text.opening-page{background-position:50% 0}
+.quran-body{position:absolute;inset:13% 12% 10% 13%;overflow:hidden;font-family:AmiriQuran,serif;font-size:31px;line-height:1.82;text-align:justify;text-align-last:center;direction:rtl}
+.opening-page .quran-body{inset:21% 17% 22%;display:flex;align-content:center;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;font-size:34px;line-height:1.95}
+.quran-body h3{flex-basis:100%;font-size:.9em;background:#fffaf0e8;border:1px solid #c7ad7a;border-radius:22px;margin:.18em 1em}
+.frame-label{position:absolute;z-index:2;display:flex;align-items:center;justify-content:center;background:#fffaf0e8;font-family:AmiriQuran,serif;font-size:clamp(13px,2.5vw,19px);line-height:1.1;white-space:nowrap}
+.frame-surah{left:13%;top:4.7%;width:32%;height:4.2%}.frame-juz{right:13%;top:4.7%;width:32%;height:4.2%}.frame-page{left:45.5%;bottom:3.6%;width:9%;height:4.2%;border-radius:50%}
+.opening-page .frame-surah{left:10%;top:1.2%;width:36%}.opening-page .frame-juz{right:10%;top:1.2%;width:36%}.opening-page .frame-page{bottom:1.8%}
+@media(max-width:420px){.quran-body{font-size:24px}.opening-page .quran-body{font-size:27px}}
