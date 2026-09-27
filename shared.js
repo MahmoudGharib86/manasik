@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 const cfg = window.MANASIK_CONFIG;
 const match = location.pathname.match(/^\/manasik\/k\/([A-Za-z2-9]{6,12})\/?$/);
-let client, user, khatma, parts=[], active, page, book, bundles=new Map(), blobUrl, textMode=true, claimJuz, busy=false;
+let client, user, khatma, parts=[], active, page, book, bundles=new Map(), blobUrl, textMode=false, claimJuz, busy=false, surahLayouts=[];
 let saving=Promise.resolve(), renderGeneration=0, refreshGeneration=0, liveChannel, liveRefreshTimer;
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
@@ -127,8 +127,13 @@ async function claim(event) {
 }
 async function loadBook() {
   if(book)return book;
-  const res=await fetch('/manasik/shared-quran.json',{signal:AbortSignal.timeout(20000)});if(!res.ok)throw Error('book unavailable');
-  book=await res.json();return book;
+  const [res,layoutRes]=await Promise.all([
+    fetch('/manasik/shared-quran.json',{signal:AbortSignal.timeout(20000)}),
+    fetch('/manasik/surah-layout.json',{signal:AbortSignal.timeout(20000)}).catch(()=>null)
+  ]);if(!res.ok)throw Error('book unavailable');
+  book=await res.json();
+  if(layoutRes?.ok)surahLayouts=await layoutRes.json();
+  return book;
 }
 const progressKey=p=>`manasik-page-${khatma.id}-${p.juz}-${p.claimed_by}-${p.claimed_at}`;
 async function openReader(p) {
@@ -160,19 +165,33 @@ async function showPage() {
   try {const bundle=await loadBundle(p.juz);if(generation!==renderGeneration||active!==p)return;
     if(!bundle[page])throw Error('missing page');
     if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(new Blob([bundle[page]],{type:'image/svg+xml'}));
-    $('page-image').src=blobUrl;$('page-image').alt='صفحة '+page+' من المصحف';$('page-image').hidden=false;$('reader-status').textContent='';
+    renderArtwork(blobUrl);$('reader-status').textContent='';
   }catch(e){if(generation!==renderGeneration)return;renderText();$('reader-status').textContent='تعذر تحميل صورة الصفحة. النص القرآني محفوظ أدناه؛ اضغط «عرض المصحف» لإعادة المحاولة.';$('text-mode').textContent='عرض المصحف';textMode=true;}
+}
+function frameLabels(container) {
+  const verses=book.verses.filter(v=>v.page===page),first=verses[0];
+  const surahLabel=document.createElement('div');surahLabel.className='frame-label frame-surah';surahLabel.textContent=first?surahTitle(first.name):'';
+  const juzLabel=document.createElement('div');juzLabel.className='frame-label frame-juz';juzLabel.textContent=juzTitle(first?.juz||active?.juz||1);
+  const pageLabel=document.createElement('div');pageLabel.className='frame-label frame-page';pageLabel.textContent=arabicDigits(page);
+  container.append(surahLabel,juzLabel,pageLabel);
+  return verses;
+}
+function renderArtwork(url) {
+  const container=$('page-text');container.replaceChildren();container.hidden=false;container.classList.toggle('opening-page',page<=2);
+  frameLabels(container);
+  const artwork=document.createElement('div');artwork.className='quran-artwork';
+  if(page>2)for(const header of surahLayouts.filter(h=>h.pageNumber===page)){
+    const band=document.createElement('div');band.className='surah-artwork-band';band.style.top=((Number(header.headerPosition)-17)/515*100)+'%';artwork.append(band);
+  }
+  const img=document.createElement('img');img.src=url;img.alt='صفحة '+page+' من المصحف';artwork.append(img);container.append(artwork);
 }
 function renderText() {
   const container=$('page-text');container.replaceChildren();container.hidden=false;
   container.classList.toggle('opening-page',page<=2);
-  const verses=book.verses.filter(v=>v.page===page);
+  const verses=frameLabels(container);
   const first=verses[0];
-  const surahLabel=document.createElement('div');surahLabel.className='frame-label frame-surah';surahLabel.textContent=first?surahTitle(first.name):'';
-  const juzLabel=document.createElement('div');juzLabel.className='frame-label frame-juz';juzLabel.textContent=juzTitle(first?.juz||active?.juz||1);
-  const pageLabel=document.createElement('div');pageLabel.className='frame-label frame-page';pageLabel.textContent=String(page).replace(/[0-9]/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
   const body=document.createElement('div');body.className='quran-body';
-  container.append(surahLabel,juzLabel,pageLabel,body);
+  container.append(body);
   let surah=0;
   for(const v of verses) {
     if(v.surah!==surah){const h=document.createElement('h3');h.textContent=surahTitle(v.name);body.append(h);surah=v.surah;}
@@ -215,7 +234,7 @@ $('refresh').onclick=()=>refresh().catch(e=>$('live-status').textContent=message
 $('claim-form').onsubmit=claim;$('cancel-claim').onclick=()=>$('claim-dialog').close();
 $('reader-back').onclick=()=>history.state?.reading?history.back():leaveReader();
 window.addEventListener('popstate',()=>{if(active)leaveReader();});
-$('previous').onclick=()=>{page--;showPage();savePage();};$('next').onclick=()=>{page++;showPage();savePage();};
+$('previous').onclick=()=>{const b=book.parts[active.juz-1];if(page<=b.first)return;page--;showPage();savePage();};$('next').onclick=()=>{const b=book.parts[active.juz-1];if(page>=b.last)return;page++;showPage();savePage();};
 $('text-mode').onclick=()=>{textMode=!textMode;$('text-mode').textContent=textMode?'عرض المصحف':'قراءة نصية';showPage();};
 $('sync-page').onclick=savePage;$('complete').onclick=()=>finish();$('release').onclick=()=>finish(true);
 $('close-khatma').onclick=async()=>{if(busy||!await confirmAction(khatma.is_closed?'إعادة فتح الحجوزات؟':'إغلاق الحجوزات الجديدة؟'))return;busy=true;try{await rpc('set_khatma_closed',{p_khatma_id:khatma.id,p_closed:!khatma.is_closed});await refresh();}catch(e){$('live-status').textContent=message(e);}finally{busy=false;}};
