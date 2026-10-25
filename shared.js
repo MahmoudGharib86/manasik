@@ -25,7 +25,9 @@ function confirmAction(message) {
 }
 const message=e => /rate|429/i.test(String(e?.message||e)) ? 'طلبات كثيرة؛ انتظر قليلًا ثم أعد المحاولة.' :
   /closed/i.test(String(e?.message||e)) ? 'الختمة مغلقة حاليًا.' :
-  /part_not_available/i.test(String(e?.message||e)) ? 'سبق مشارك آخر إلى حجز هذا الجزء. حدّث القائمة.' : 'تعذر الاتصال أو إتمام الطلب. أعد المحاولة؛ لم يتم تأكيد التغيير.';
+  /part_not_available/i.test(String(e?.message||e)) ? 'سبق مشارك آخر إلى حجز هذا الجزء. حدّث القائمة.' :
+  /cannot_complete_part/i.test(String(e?.message||e)) ? 'تغيّرت حالة الجزء؛ حدّث القائمة ثم أعد المحاولة.' :
+  /name_required/i.test(String(e?.message||e)) ? 'اكتب اسمًا من حرفين على الأقل.' : 'تعذر الاتصال أو إتمام الطلب. أعد المحاولة؛ لم يتم تأكيد التغيير.';
 async function result(request) { const r=await request; if(r.error) throw r.error; return r.data; }
 const rpc=(name,params)=>result(client.rpc(name,params));
 const params=juz=>({p_khatma_id:khatma.id,p_juz:juz});
@@ -98,7 +100,7 @@ async function refresh() {
 function scheduleLiveRefresh() {
   clearTimeout(liveRefreshTimer);
   liveRefreshTimer=setTimeout(()=>{
-    if(khatma&&!busy&&!active&&!$('claim-dialog').open) refresh().catch(()=>$('live-status').textContent='انقطع التحديث اللحظي مؤقتًا؛ ستتم إعادة المحاولة تلقائيًا.');
+    if(khatma&&!busy&&!active&&!$('claim-dialog').open&&!$('continue-dialog').open) refresh().catch(()=>$('live-status').textContent='انقطع التحديث اللحظي مؤقتًا؛ ستتم إعادة المحاولة تلقائيًا.');
   },120);
 }
 function ensureRealtime() {
@@ -116,7 +118,38 @@ function selectPart(p) {
     if(khatma.is_closed){$('live-status').textContent='الختمة مغلقة للحجز.';return;}
     claimJuz=p.juz;$('claim-number').textContent=p.juz;$('reader-name').value=storage.get('manasik-reader-name')||'';$('claim-error').textContent='';$('claim-dialog').showModal();
   } else if(p.claimed_by===user.id || p.status==='completed') { openReader(p); }
-  else {$('live-status').textContent=`الجزء محجوز للقارئ ${p.claimed_name||'المشارك'}. اختر جزءًا متاحًا.`;}
+  else openContinue(p);
+}
+// A part someone else reserved stays open to every member: read it as is,
+// continue it under your own name, or record its completion.
+let continuePart;
+function openContinue(p) {
+  continuePart=p;const reader=p.claimed_name||'مشارك آخر';
+  $('continue-title').textContent=juzTitle(p.juz);
+  $('continue-badge').textContent='قيد القراءة · '+reader;
+  $('continue-text').textContent=`اختار ${reader} هذا الجزء. إن لم يتمكّن من قراءته يمكنك أن تقرأه أنت وتكمله باسمك.`;
+  $('continue-read').textContent=`اقرأ دون تغيير الاسم (${reader})`;
+  $('continue-name').value=storage.get('manasik-reader-name')||'';$('continue-error').textContent='';
+  updateContinueHint();$('continue-dialog').showModal();
+}
+function updateContinueHint() {
+  const name=$('continue-name').value.trim(),reader=continuePart?.claimed_name||'مشارك آخر';
+  $('continue-hint').textContent=name.length>=2?`سيظهر للمشاركين أن «${name}» يقرأ هذا الجزء بدلًا من «${reader}»`:'اكتب اسمك لتنقل قراءة الجزء إليك';
+  $('continue-take').disabled=name.length<2;
+}
+async function continueAction(kind,event) {
+  event?.preventDefault();if(busy||!continuePart)return;const p=continuePart;
+  if(kind==='complete'&&!await confirmAction('تسجيل إتمام '+juzTitle(p.juz)+' كاملًا؟'))return;
+  busy=true;for(const id of ['continue-take','continue-read','continue-complete'])$(id).disabled=true;
+  try{
+    if(kind==='take'){
+      const name=$('continue-name').value.trim();if(name.length<2){$('continue-error').textContent='اكتب اسمًا من حرفين على الأقل.';return;}
+      const rows=await rpc('take_over_khatma_part',{...params(p.juz),p_name:name});storage.set('manasik-reader-name',name);
+      $('continue-dialog').close();busy=false;await openReader(rows[0]);
+    }else if(kind==='read'){$('continue-dialog').close();busy=false;await openReader(p);}
+    else{await rpc('complete_khatma_part',params(p.juz));$('continue-dialog').close();$('live-status').textContent='تم تسجيل '+juzTitle(p.juz)+' كمقروء. جزاك الله خيرًا.';busy=false;await refresh();}
+  }catch(e){$('continue-error').textContent=message(e);}
+  finally{busy=false;for(const id of ['continue-read','continue-complete'])$(id).disabled=false;updateContinueHint();}
 }
 async function claim(event) {
   event.preventDefault();if(busy)return;
@@ -139,8 +172,8 @@ const progressKey=p=>`manasik-page-${khatma.id}-${p.juz}-${p.claimed_by}-${p.cla
 async function openReader(p) {
   active=p;$('hub').hidden=true;$('reader').hidden=false;$('reader-status').textContent='جارٍ تجهيز صفحات الجزء…';
   $('previous').disabled=true;$('next').disabled=true;
-  $('page-image').hidden=true;$('page-text').hidden=true;$('reader-title').textContent='الجزء '+p.juz;
-  const mine=p.claimed_by===user.id&&p.status==='claimed';$('complete').hidden=!mine;$('release').hidden=!mine;
+  $('page-image').hidden=true;$('page-text').hidden=true;$('reader-title').textContent=juzTitle(p.juz);
+  const mine=p.claimed_by===user.id&&p.status==='claimed';$('complete').hidden=p.status!=='claimed';$('release').hidden=!mine;
   try {await loadBook();if(active!==p)return;const bounds=book.parts[p.juz-1];
     const local=Number(storage.get(progressKey(p))), remote=p.last_read_page;
     page=Math.max(bounds.first,Math.min(bounds.last,local||remote||bounds.first));
@@ -234,12 +267,42 @@ $('refresh').onclick=()=>refresh().catch(e=>$('live-status').textContent=message
 $('claim-form').onsubmit=claim;$('cancel-claim').onclick=()=>$('claim-dialog').close();
 $('reader-back').onclick=()=>history.state?.reading?history.back():leaveReader();
 window.addEventListener('popstate',()=>{if(active)leaveReader();});
-$('previous').onclick=()=>{const b=book.parts[active.juz-1];if(page<=b.first)return;page--;showPage();savePage();};$('next').onclick=()=>{const b=book.parts[active.juz-1];if(page>=b.last)return;page++;showPage();savePage();};
+function turnPage(step) {
+  if(!active||!book)return false;const b=book.parts[active.juz-1],target=page+step;
+  if(target<b.first||target>b.last)return false;page=target;showPage();savePage();return true;
+}
+$('previous').onclick=()=>turnPage(-1);$('next').onclick=()=>turnPage(1);
+// Swipe like a printed Arabic mushaf: dragging toward the right brings the
+// next page, toward the left returns to the previous one.
+(()=>{
+  const paper=$('paper');let x0=null,y0=0,t0=0,dragging=false;
+  const sheet=()=>$('page-text');
+  paper.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;x0=e.clientX;y0=e.clientY;t0=Date.now();dragging=false;});
+  paper.addEventListener('pointermove',e=>{
+    if(x0===null)return;const dx=e.clientX-x0,dy=e.clientY-y0;
+    if(!dragging&&Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){dragging=true;sheet().classList.add('swiping');}
+    if(dragging){sheet().style.transform=`translateX(${dx*.6}px)`;sheet().style.opacity=String(1-Math.min(.35,Math.abs(dx)/900));}
+  });
+  const end=e=>{
+    if(x0===null)return;const dx=e.clientX-x0,dy=e.clientY-y0,fast=Date.now()-t0<300;
+    const s=sheet();s.classList.remove('swiping');s.style.transform='';s.style.opacity='';
+    if(dragging&&(Math.abs(dx)>70||(fast&&Math.abs(dx)>35))&&Math.abs(dx)>Math.abs(dy))turnPage(dx>0?1:-1);
+    x0=null;dragging=false;
+  };
+  paper.addEventListener('pointerup',end);paper.addEventListener('pointercancel',e=>{x0=null;dragging=false;const s=sheet();s.classList.remove('swiping');s.style.transform='';s.style.opacity='';});
+  document.addEventListener('keydown',e=>{
+    if(!active||document.querySelector('dialog[open]'))return;
+    if(e.key==='ArrowLeft'){turnPage(1);e.preventDefault();}else if(e.key==='ArrowRight'){turnPage(-1);e.preventDefault();}
+  });
+})();
+$('continue-form').onsubmit=e=>continueAction('take',e);$('continue-read').onclick=()=>continueAction('read');
+$('continue-complete').onclick=()=>continueAction('complete');$('continue-cancel').onclick=()=>$('continue-dialog').close();
+$('continue-name').oninput=updateContinueHint;
 $('text-mode').onclick=()=>{textMode=!textMode;$('text-mode').textContent=textMode?'عرض المصحف':'قراءة نصية';showPage();};
 $('sync-page').onclick=savePage;$('complete').onclick=()=>finish();$('release').onclick=()=>finish(true);
 $('close-khatma').onclick=async()=>{if(busy||!await confirmAction(khatma.is_closed?'إعادة فتح الحجوزات؟':'إغلاق الحجوزات الجديدة؟'))return;busy=true;try{await rpc('set_khatma_closed',{p_khatma_id:khatma.id,p_closed:!khatma.is_closed});await refresh();}catch(e){$('live-status').textContent=message(e);}finally{busy=false;}};
 // Realtime is primary; this slower poll recovers after tab suspension or a websocket interruption.
-setInterval(()=>{if(khatma&&!document.hidden&&!busy&&!active&&!$('claim-dialog').open)refresh().catch(()=>$('live-status').textContent='تعذر التحديث التلقائي. تحقق من الاتصال واضغط تحديث.');},30000);
+setInterval(()=>{if(khatma&&!document.hidden&&!busy&&!active&&!$('claim-dialog').open&&!$('continue-dialog').open)refresh().catch(()=>$('live-status').textContent='تعذر التحديث التلقائي. تحقق من الاتصال واضغط تحديث.');},30000);
 window.addEventListener('online',()=>{if(active)savePage();else if(khatma)refresh().catch(()=>{});});
 
 // These use the same member-only records and allowed action kinds as the app.
